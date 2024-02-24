@@ -1,11 +1,9 @@
-
 // Intro: This is Lila Protocol, a rate swap protocol yielding users what they want the most
 // Author: @0xrishabh
 // Functions:
 //     * create_order: Called by any user to set their terms for order
 //     * fullfill_order: Called by the user who wants to fill an order
 //     * get_order: Returns all the info about the order and it's status
-
 
 mod zklend;
 
@@ -14,7 +12,7 @@ use starknet::ContractAddress;
 struct OrderParams {
     filled: bool,
     strategy: u8,
-    amount: u256,
+    amount: felt252,
     interest: u256,
     term_time: u64,
     filled_time: u64,
@@ -24,13 +22,15 @@ struct OrderParams {
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
 struct StrategyInfo {
-   token: ContractAddress,
-   protocol: ContractAddress,
+    token: ContractAddress,
+    protocol: ContractAddress,
 }
 
 #[starknet::interface]
 trait IOrder<TContractState> {
-    fn create_order(ref self: TContractState, amount: u256, interest: u256, term_time: u64, strategy: u8);
+    fn create_order(
+        ref self: TContractState, amount: felt252, interest: u256, term_time: u64, strategy: u8
+    );
     fn fullfill_order(ref self: TContractState, id: felt252);
     fn withdraw(ref self: TContractState, id: felt252);
     fn get_order(self: @TContractState, id: felt252) -> lila_on_starknet::OrderParams;
@@ -38,6 +38,7 @@ trait IOrder<TContractState> {
 
 #[starknet::contract]
 mod Order {
+    use core::traits::Into;
     use starknet::get_block_timestamp;
     use openzeppelin::token::erc20::interface::{
         IERC20, IERC20Metadata, ERC20ABIDispatcher, ERC20ABIDispatcherTrait, IERC20Dispatcher
@@ -45,7 +46,7 @@ mod Order {
     use core::poseidon::PoseidonTrait;
     use core::hash::{HashStateTrait, HashStateExTrait};
     use lila_on_starknet::zklend;
-    use lila_on_starknet::zklend::{ IZklendMarketDispatcher, IZklendMarketDispatcherTrait };
+    use lila_on_starknet::zklend::{IZklendMarketDispatcher, IZklendMarketDispatcherTrait};
 
     #[storage]
     struct Storage {
@@ -65,24 +66,17 @@ mod Order {
         // * Save the order of the user
         // * Emit the event for the indexers and frontend
         fn create_order(
-            ref self: ContractState,
-            amount: u256,
-            interest: u256,
-            term_time: u64,
-            strategy: u8
-        ){
+            ref self: ContractState, amount: felt252, interest: u256, term_time: u64, strategy: u8
+        ) {
+            let u256_amount: u256 = amount.into();
             let token_address = self.strategy.read(strategy).token;
-            let token = ERC20ABIDispatcher {contract_address: token_address};
+            let token = ERC20ABIDispatcher { contract_address: token_address };
             let user = starknet::get_caller_address();
-            token.transferFrom(
-                user,
-                starknet::get_contract_address(),
-                amount
-            );
+            token.transferFrom(user, starknet::get_contract_address(), u256_amount);
 
-            let order = lila_on_starknet::OrderParams{
-                amount: amount,
-                interest: interest,
+            let order = lila_on_starknet::OrderParams {
+                amount,
+                interest,
                 strategy: strategy,
                 term_time: term_time,
                 filled: false,
@@ -95,34 +89,34 @@ mod Order {
             let id = PoseidonTrait::new().update(order.user.into()).update(nonce.into()).finalize();
 
             self.orders.write(id, order);
-            self.nonce.write(nonce+1);
-
+            self.nonce.write(nonce + 1);
         }
 
-        fn fullfill_order(ref self: ContractState, id: felt252){
+        fn fullfill_order(ref self: ContractState, id: felt252) {
             let order = self.orders.read(id);
             let strategy = self.strategy.read(order.strategy);
-            let interest_amount = order.amount * order.interest;
+            let interest_amount = order.amount.into() * order.interest;
             let token_address = strategy.token;
-            let token = ERC20ABIDispatcher {contract_address: token_address};
-            token.transferFrom(
-                starknet::get_caller_address(),
-                starknet::get_contract_address(),
-                interest_amount
-            );
-            token.approve(strategy.protocol, order.amount);
+            let token = ERC20ABIDispatcher { contract_address: token_address };
+            token
+                .transferFrom(
+                    starknet::get_caller_address(),
+                    starknet::get_contract_address(),
+                    interest_amount
+                );
+            token.approve(strategy.protocol, order.amount.into());
 
             // Integrating ZkLend
 
-            let zklend = IZklendMarketDispatcher{ contract_address: strategy.protocol };
-            zklend.deposit(token, order.amount);
+            let zklend = IZklendMarketDispatcher { contract_address: strategy.protocol };
+            zklend.deposit(token: token.contract_address, amount: order.amount);
         }
 
-        fn withdraw(ref self: ContractState, id:felt252){
+        fn withdraw(ref self: ContractState, id: felt252) {
             let order = self.orders.read(id);
             assert(
-                order.maker == starknet::get_caller_address() ||
-                order.filled_time - get_block_timestamp() >= order.term_time,
+                order.maker == starknet::get_caller_address() || order.filled_time
+                    - get_block_timestamp() >= order.term_time,
                 0
             );
         }
@@ -130,7 +124,5 @@ mod Order {
         fn get_order(self: @ContractState, id: felt252) -> lila_on_starknet::OrderParams {
             self.orders.read(id)
         }
-
-
     }
 }
