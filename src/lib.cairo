@@ -7,6 +7,7 @@
 //     * get_order: Returns all the info about the order and it's status
 
 
+mod zklend;
 
 use starknet::ContractAddress;
 #[derive(Copy, Drop, Serde, starknet::Store)]
@@ -43,7 +44,8 @@ mod Order {
     };
     use core::poseidon::PoseidonTrait;
     use core::hash::{HashStateTrait, HashStateExTrait};
-    use lila_on_starknet::IZKlend;
+    use lila_on_starknet::zklend;
+    use lila_on_starknet::zklend::{ IZklendMarketDispatcher, IZklendMarketDispatcherTrait };
 
     #[storage]
     struct Storage {
@@ -112,7 +114,7 @@ mod Order {
 
             // Integrating ZkLend
 
-            let zklend = IZKlend{ contract_address: strategy.protocol };
+            let zklend = IZklendMarketDispatcher{ contract_address: strategy.protocol };
             zklend.deposit(token, order.amount);
         }
 
