@@ -6,7 +6,7 @@
 //     * fullfill_order: Called by the user who wants to fill an order
 //     * get_order: Returns all the info about the order and it's status
 
-mod IZKlend;
+
 
 use starknet::ContractAddress;
 #[derive(Copy, Drop, Serde, starknet::Store)]
@@ -43,6 +43,7 @@ mod Order {
     };
     use core::poseidon::PoseidonTrait;
     use core::hash::{HashStateTrait, HashStateExTrait};
+    use lila_on_starknet::IZKlend;
 
     #[storage]
     struct Storage {
@@ -111,7 +112,7 @@ mod Order {
 
             // Integrating ZkLend
 
-            let zklend = IZKlend{ strategy.protocol };
+            let zklend = IZKlend{ contract_address: strategy.protocol };
             zklend.deposit(token, order.amount);
         }
 
