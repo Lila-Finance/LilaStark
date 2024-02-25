@@ -62,9 +62,10 @@ fn test_create_order() {
     let strategy : felt252 = 0;
 
     dispatcher.set_strategy(starknet::contract_address_const::<0x02>(), starknet::contract_address_const::<0x03>());
-    let (token,protocol) = dispatcher.get_strategy(strategy);
-    println!("{}", token);
-   //dispatcher.create_order(amount, interest, term_time, strategy);
+    //let tmp = dispatcher.get_strategy(strategy);
+
+    
+   dispatcher.create_order(amount, interest, term_time, strategy);
     
 }
 

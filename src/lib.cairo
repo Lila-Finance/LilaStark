@@ -78,6 +78,7 @@ mod Lila {
             let token_address = self.strategy.read(strategy).token;
             let token = ERC20ABIDispatcher { contract_address: token_address };
             let user = starknet::get_caller_address();
+            // allow transfer
             token.transferFrom(user, starknet::get_contract_address(), u256_amount);
             self.balance.write(self.balance.read() + amount);
 
@@ -153,3 +154,5 @@ mod Lila {
         }
     }
 }
+
+//wrapper on each protocol 
