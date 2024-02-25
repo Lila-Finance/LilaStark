@@ -8,7 +8,7 @@ use lila_on_starknet::ILilaDispatcher;
 use lila_on_starknet::ILilaDispatcherTrait;
 use core::poseidon::PoseidonTrait;
 use core::hash::{HashStateTrait, HashStateExTrait};
-use snforge_std::{start_prank, stop_prank, CheatTarget};
+use snforge_std::{start_prank, stop_prank, CheatTarget, start_warp};
 
 fn deploy_contract(name: felt252) -> ContractAddress {
     let contract = declare(name);
@@ -75,13 +75,14 @@ fn test_create_order() {
 #[test]
 #[fork("mainnet")]
 fn test_fulfil_order() {
-    // create Order
-    let lila_address = deploy_contract('Lila');
-    let (erc_dispatcher, _) = deploy_erc20();
-    let lila_dispatcher = ILilaDispatcher { contract_address: lila_address };
     let zUSDT_address: ContractAddress =
        0x00811d8da5dc8a2206ea7fd0b28627c2d77280a515126e62baa4d78e22714c4a.try_into().unwrap();
     let zUSDT = ERC20ABIDispatcher { contract_address: zUSDT_address};
+    let (erc_dispatcher, _) = deploy_erc20();
+
+    let lila_address = deploy_contract('Lila');
+    let lila_dispatcher = ILilaDispatcher { contract_address: lila_address };
+
     let amount : felt252 = 100 * 1000000;
     let interest: u256 = 3;
     let term_time : u64 = 1;
@@ -104,6 +105,54 @@ fn test_fulfil_order() {
 
     // assert!(zUSDT.balance_of(lila_address) == 100 * 1000000);
     assert!(erc_dispatcher.balance_of(lila_address) == interest_amount);
+
+}
+
+#[test]
+#[fork("mainnet")]
+fn test_createAndFullFillThenWithdraw_order() {
+    let zUSDT_address: ContractAddress =
+       0x00811d8da5dc8a2206ea7fd0b28627c2d77280a515126e62baa4d78e22714c4a.try_into().unwrap();
+    let zUSDT = ERC20ABIDispatcher { contract_address: zUSDT_address};
+    let (erc_dispatcher, _) = deploy_erc20();
+
+    let lila_address = deploy_contract('Lila');
+    let lila_dispatcher = ILilaDispatcher { contract_address: lila_address };
+
+    let amount : felt252 = 100 * 1000000;
+    let interest: u256 = 3;
+    let term_time : u64 = 1;
+    let strategy : felt252 = 0;
+
+    let id = create_order(
+        amount,
+        interest,
+        term_time,
+        strategy,
+        lila_address
+    );
+
+    // FullFill Order
+    let mut order = lila_dispatcher.get_order(id);
+    let interest_amount = order.amount.into() * order.interest / 100;
+
+    erc_dispatcher.approve(lila_address, interest_amount);
+    lila_dispatcher.fulfill_order(id);
+
+    // assert!(zUSDT.balance_of(lila_address) == 100 * 1000000);
+    assert!(erc_dispatcher.balance_of(lila_address) == interest_amount);
+    let mut order = lila_dispatcher.get_order(id);
+    let roll_time = starknet::get_block_timestamp() + 315360;
+    let zklend: ContractAddress =
+        0x04c0a5193d58f74fbace4b74dcf65481e734ed1714121bdc571da345540efa05.try_into().unwrap();
+
+    start_warp(CheatTarget::One(zklend), roll_time);
+    start_prank(
+        CheatTarget::One(lila_address),
+        order.maker
+    );
+    lila_dispatcher.withdraw(id);
+    stop_prank(CheatTarget::One(lila_address));
 
 }
 

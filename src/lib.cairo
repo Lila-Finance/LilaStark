@@ -68,6 +68,7 @@ mod Lila {
         orders: LegacyMap::<felt252, lila_on_starknet::OrderParams>,
         strategy: LegacyMap::<felt252, lila_on_starknet::StrategyInfo>,
         nonce: u64,
+        total_strategy: u64
     }
 
     #[abi(embed_v0)]
@@ -108,7 +109,7 @@ mod Lila {
         }
 
         fn fulfill_order(ref self: ContractState, id: felt252) {
-            let order = self.orders.read(id);
+            let mut order = self.orders.read(id);
             let strategy = self.strategy.read(order.strategy);
             let interest_amount = order.amount.into() * order.interest / 100;
             let token_address = strategy.token;
@@ -125,6 +126,10 @@ mod Lila {
 
             let zklend = IZklendMarketDispatcher { contract_address: strategy.protocol };
             zklend.deposit(token: token.contract_address, amount: order.amount);
+
+            order.filled_time = get_block_timestamp();
+            order.maker = starknet::get_caller_address();
+            self.orders.write(id, order);
         }
 
         fn set_strategy(ref self: ContractState, token: starknet::ContractAddress,  protocol: starknet::ContractAddress) {
@@ -134,28 +139,32 @@ mod Lila {
                 protocol
             };
 
-            self.strategy.write(0, strategy);
-            // self.nonce.write(nonce + 1);
+            let total_strategy = self.total_strategy.read();
+            self.strategy.write(total_strategy.into(), strategy);
+            self.total_strategy.write(total_strategy + 1);
         }
 
         fn withdraw(ref self: ContractState, id: felt252) {
             let order = self.orders.read(id);
             let strategy = self.strategy.read(order.strategy);
+
             assert!(
-                order.maker == starknet::get_caller_address() || order.filled_time
-                    - get_block_timestamp() >= order.term_time,
+                order.maker == starknet::get_caller_address() ||
+                get_block_timestamp() - order.filled_time >= order.term_time
             );
 
             let token = ERC20ABIDispatcher { contract_address: strategy.token };
             let zklend = IZklendMarketDispatcher { contract_address: strategy.protocol };
             let this = starknet::get_contract_address();
+
             let balance_before = token.balanceOf(this);
             zklend.withdraw_all(token: strategy.token);
-
             let balance_after = token.balanceOf(this);
-            let profit = (balance_after - balance_before) - order.amount.into();
 
-            token.transfer(order.user, order.amount.into());
+            let profit = (balance_after - balance_before) - order.amount.into();
+            let interest_amount = order.amount.into() * order.interest / 100;
+
+            token.transfer(order.user, order.amount.into() + interest_amount);
             token.transfer(order.maker, profit);
 
         }
@@ -167,6 +176,7 @@ mod Lila {
         fn get_order(self: @ContractState, id: felt252) -> lila_on_starknet::OrderParams {
             self.orders.read(id)
         }
+
         fn get_nonce(self: @ContractState) -> u64 {
             self.nonce.read()
         }
