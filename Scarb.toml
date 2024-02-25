@@ -13,3 +13,8 @@ openzeppelin = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", ta
 [[target.starknet-contract]]
 sierra = true
 casm = true
+
+[[tool.snforge.fork]]
+name = "mainnet"
+url = "https://rpc.nethermind.io/mainnet-juno/?apikey=LuUVjCjLvydVLOQgjGgnf63izfolex2EzymmzaahwMx8MLSE"
+block_id.tag = "Latest"

@@ -8,7 +8,7 @@
 mod mocks;
 #[cfg(test)]
 mod tests;
-
+use core::fmt::{Display, Formatter, Error};
 mod zklend;
 use starknet::ContractAddress;
 #[derive(Copy, Drop, Serde, starknet::Store)]
@@ -22,6 +22,15 @@ struct OrderParams {
     user: ContractAddress,
     maker: ContractAddress,
 }
+// impl OrderParamsDisplay of Display<OrderParams> {
+//     fn fmt(self: @OrderParams, ref f: Formatter) -> Result<(), Error> {
+//         let amount = *self.amount;
+//         let interest = *self.interest;
+//         let term_time = *self.term_time;
+//         let user = *self.user;
+//         return writeln!(f, "Order ({amount}, {interest}, {term_time})");
+//     }
+// }
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
 struct StrategyInfo {
@@ -36,9 +45,9 @@ trait ILila<TContractState> {
     );
     fn fulfill_order(ref self: TContractState, id: felt252);
     fn withdraw(ref self: TContractState, id: felt252);
+    fn get_nonce(self: @TContractState) -> u64;
     fn get_order(self: @TContractState, id: felt252) -> lila_on_starknet::OrderParams;
-    fn get_balance(self: @TContractState) -> felt252;
-    fn get_strategy(self: @TContractState, id: felt252) -> lila_on_starknet::StrategyInfo; 
+    fn get_strategy(self: @TContractState, id: felt252) -> lila_on_starknet::StrategyInfo;
     fn set_strategy (ref self: TContractState, token: ContractAddress, protocol: ContractAddress);
 }
 
@@ -56,11 +65,9 @@ mod Lila {
 
     #[storage]
     struct Storage {
-        // id ==> OrderParams
         orders: LegacyMap::<felt252, lila_on_starknet::OrderParams>,
         strategy: LegacyMap::<felt252, lila_on_starknet::StrategyInfo>,
         nonce: u64,
-        balance: felt252,
     }
 
     #[abi(embed_v0)]
@@ -80,7 +87,6 @@ mod Lila {
             let user = starknet::get_caller_address();
             // allow transfer
             token.transferFrom(user, starknet::get_contract_address(), u256_amount);
-            self.balance.write(self.balance.read() + amount);
 
             let order = lila_on_starknet::OrderParams {
                 amount,
@@ -98,12 +104,13 @@ mod Lila {
 
             self.orders.write(id, order);
             self.nonce.write(nonce + 1);
+
         }
 
         fn fulfill_order(ref self: ContractState, id: felt252) {
             let order = self.orders.read(id);
             let strategy = self.strategy.read(order.strategy);
-            let interest_amount = order.amount.into() * order.interest;
+            let interest_amount = order.amount.into() * order.interest / 100;
             let token_address = strategy.token;
             let token = ERC20ABIDispatcher { contract_address: token_address };
             token
@@ -121,24 +128,36 @@ mod Lila {
         }
 
         fn set_strategy(ref self: ContractState, token: starknet::ContractAddress,  protocol: starknet::ContractAddress) {
-            
+
             let strategy = lila_on_starknet::StrategyInfo {
                 token,
                 protocol
             };
-            let nonce = self.nonce.read();
-            let id = PoseidonTrait::new().update(strategy.token.into()).update(nonce.into()).finalize();
-            self.strategy.write(id, strategy);
-            self.nonce.write(nonce + 1);
+
+            self.strategy.write(0, strategy);
+            // self.nonce.write(nonce + 1);
         }
 
         fn withdraw(ref self: ContractState, id: felt252) {
             let order = self.orders.read(id);
-            assert(
+            let strategy = self.strategy.read(order.strategy);
+            assert!(
                 order.maker == starknet::get_caller_address() || order.filled_time
                     - get_block_timestamp() >= order.term_time,
-                0
             );
+
+            let token = ERC20ABIDispatcher { contract_address: strategy.token };
+            let zklend = IZklendMarketDispatcher { contract_address: strategy.protocol };
+            let this = starknet::get_contract_address();
+            let balance_before = token.balanceOf(this);
+            zklend.withdraw_all(token: strategy.token);
+
+            let balance_after = token.balanceOf(this);
+            let profit = (balance_after - balance_before) - order.amount.into();
+
+            token.transfer(order.user, order.amount.into());
+            token.transfer(order.maker, profit);
+
         }
 
         fn get_strategy(self: @ContractState, id: felt252) -> lila_on_starknet::StrategyInfo {
@@ -148,11 +167,10 @@ mod Lila {
         fn get_order(self: @ContractState, id: felt252) -> lila_on_starknet::OrderParams {
             self.orders.read(id)
         }
-
-        fn get_balance(self: @ContractState) -> felt252 {
-            self.balance.read()
+        fn get_nonce(self: @ContractState) -> u64 {
+            self.nonce.read()
         }
     }
 }
 
-//wrapper on each protocol 
+//wrapper on each protocol

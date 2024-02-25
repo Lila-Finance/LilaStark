@@ -39,12 +39,11 @@ mod ERC20 {
     #[constructor]
     fn constructor(
         ref self: ContractState,
-        name: felt252,
-        symbol: felt252,
-        fixed_supply: u256,
-        recipient: ContractAddress
     ) {
+        let name: felt252 = 0x4d79546f6b656e;
+        let symbol: felt252 = 0x4d544b;
+        let fixed_supply: u256 = 20000000;
         self.erc20.initializer(name, symbol);
-        self.erc20._mint(recipient, fixed_supply);
+        self.erc20._mint(starknet::get_caller_address(), fixed_supply);
     }
 }
