@@ -61,6 +61,7 @@ mod Lila {
         strategy: LegacyMap::<felt252, lila_on_starknet::StrategyInfo>,
         nonce: u64,
         balance: felt252,
+        counter: felt252,
     }
 
     #[abi(embed_v0)]
@@ -78,6 +79,9 @@ mod Lila {
             let token_address = self.strategy.read(strategy).token;
             let token = ERC20ABIDispatcher { contract_address: token_address };
             let user = starknet::get_caller_address();
+            let userf:felt252 = user.into();
+            let balace = token.balance_of(user);
+            println!("{}", balace);
             // allow transfer
             token.transferFrom(user, starknet::get_contract_address(), u256_amount);
             self.balance.write(self.balance.read() + amount);
@@ -95,7 +99,6 @@ mod Lila {
 
             let nonce = self.nonce.read();
             let id = PoseidonTrait::new().update(order.user.into()).update(nonce.into()).finalize();
-
             self.orders.write(id, order);
             self.nonce.write(nonce + 1);
         }
@@ -126,10 +129,8 @@ mod Lila {
                 token,
                 protocol
             };
-            let nonce = self.nonce.read();
-            let id = PoseidonTrait::new().update(strategy.token.into()).update(nonce.into()).finalize();
-            self.strategy.write(id, strategy);
-            self.nonce.write(nonce + 1);
+            self.strategy.write(self.counter.read(), strategy);
+            self.counter.write(self.counter.read() + 1);
         }
 
         fn withdraw(ref self: ContractState, id: felt252) {

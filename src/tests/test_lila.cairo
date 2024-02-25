@@ -1,5 +1,6 @@
 use starknet::ContractAddress;
 use snforge_std::trace::{CallTrace, CallEntryPoint, CallType, EntryPointType, get_call_trace};
+use snforge_std::{start_prank, CheatTarget};
 
 use snforge_std::{declare, ContractClassTrait};
 use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
@@ -37,8 +38,8 @@ fn test_initial_balance() {
 #[available_gas(3000000000000000)]
 fn test_balance_of_erc20() {
     let (dispatcher, _) = deploy_erc20();
-    let recipient = starknet::contract_address_const::<0x01>();
-    let balance = dispatcher.balance_of(recipient);
+    let pool = starknet::contract_address_const::<0x01>();
+    let balance = dispatcher.balance_of(pool);
     assert(balance == 20000000, 'Invalid Balance');
 }
 
@@ -47,11 +48,13 @@ fn test_create_order() {
     
     let contract_address = deploy_contract('Lila');
    // println!("{}", get_call_trace());
-   let a : felt252 =contract_address.into(); 
-    println!("{}", a);
 
     let dispatcher = ILilaDispatcher { contract_address };
-    let (erc_dispatcher, _) = deploy_erc20();
+    let (erc_dispatcher, erc20_address) = deploy_erc20();
+    let recipient = starknet::contract_address_const::<0x02>();
+    let pool = starknet::contract_address_const::<0x01>();
+    let erc20_address_r:felt252 = erc20_address.into();
+    println!("{}", erc20_address_r);
 
     let balance_before = dispatcher.get_balance();
     assert(balance_before == 0, 'Invalid balance');
@@ -61,10 +64,22 @@ fn test_create_order() {
     let term_time : u64 = 1;
     let strategy : felt252 = 0;
 
-    dispatcher.set_strategy(starknet::contract_address_const::<0x02>(), starknet::contract_address_const::<0x03>());
-    //let tmp = dispatcher.get_strategy(strategy);
+    dispatcher.set_strategy(erc20_address, recipient);
+    let strategy_info = dispatcher.get_strategy(strategy);
+    let token_addr: felt252 = strategy_info.token.into();
+    println!("{}", token_addr);
+    assert(erc20_address_r == token_addr, 'Strategy getter is incorrect');
 
-    
+     start_prank(CheatTarget::One(erc20_address), pool);
+
+    erc_dispatcher.transfer(recipient, 2*amount.into());
+    start_prank(CheatTarget::One(erc20_address), recipient);
+    //assert(erc_dispatcher.balance_of(recipient) == 2*amount.into(), 'Invalid recipient Balance');
+
+    erc_dispatcher.approve(contract_address, 2*amount.into());
+
+    start_prank(CheatTarget::One(contract_address), recipient);
+
    dispatcher.create_order(amount, interest, term_time, strategy);
     
 }
