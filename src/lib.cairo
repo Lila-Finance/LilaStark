@@ -82,8 +82,10 @@ mod Lila {
             let userf:felt252 = user.into();
             let balace = token.balance_of(user);
             println!("{}", balace);
+            println!("{}", u256_amount);
             // allow transfer
             token.transferFrom(user, starknet::get_contract_address(), u256_amount);
+            
             self.balance.write(self.balance.read() + amount);
 
             let order = lila_on_starknet::OrderParams {

@@ -76,9 +76,11 @@ fn test_create_order() {
     start_prank(CheatTarget::One(erc20_address), recipient);
     //assert(erc_dispatcher.balance_of(recipient) == 2*amount.into(), 'Invalid recipient Balance');
 
-    erc_dispatcher.approve(contract_address, 2*amount.into());
+    erc_dispatcher.approve(contract_address, amount.into());
 
     start_prank(CheatTarget::One(contract_address), recipient);
+    let allowance = erc_dispatcher.allowance(recipient,contract_address );
+    assert_eq!(allowance, amount.into());
 
    dispatcher.create_order(amount, interest, term_time, strategy);
     
