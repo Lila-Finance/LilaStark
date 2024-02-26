@@ -161,11 +161,22 @@ mod Lila {
             zklend.withdraw_all(token: strategy.token);
             let balance_after = token.balanceOf(this);
 
-            let profit = (balance_after - balance_before) - order.amount.into();
+            // After withdraw: oldFunds + order.amount + interest
+            // Edge Case: if the funds are withdrawn too early,
+            // then we will recieve order.amount - zklend fee
+
+            let mut profit = 0;
+            let balance_diff = balance_after - balance_before;
+            if balance_diff > order.amount.into() {
+                profit = balance_diff - order.amount.into()
+            }
+
             let interest_amount = order.amount.into() * order.interest / 100;
 
             token.transfer(order.user, order.amount.into() + interest_amount);
-            token.transfer(order.maker, profit);
+            if profit > 0 {
+                token.transfer(order.maker, profit);
+            }
 
         }
 
