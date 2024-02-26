@@ -129,6 +129,7 @@ mod Lila {
             let zklend = IZklendMarketDispatcher { contract_address: strategy.protocol };
             zklend.deposit(token: token.contract_address, amount: order.amount);
 
+            order.filled = true;
             order.filled_time = get_block_timestamp();
             order.maker = starknet::get_caller_address();
             self.orders.write(id, order);
