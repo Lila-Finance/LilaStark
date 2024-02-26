@@ -1,0 +1,18 @@
+purvachaudhari@Purvas-MacBook-Pro-2 LilaStark % starkli declare target/dev/lila_on_starknet_Lila.contract_class.json --account  /private/tmp/account1 --keystore /private/tmp/key1 --rpc "https://starknet-testnet.public.blastapi.io/rpc/v0_6"
+Enter keystore password: 
+Sierra compiler version not specified. Attempting to automatically decide version to use...
+Network detected: goerli. Using the default compiler version for this network: 2.4.0. Use the --compiler-version flag to choose a different version.
+Declaring Cairo 1 class: 0x07459430e068ca6d9daeadb305b9922e5c1826ff76b1b8992692b85b916d50fe
+Compiling Sierra class to CASM with compiler version 2.4.0...
+CASM class hash: 0x0047b6d62b55d2598a03d4763e0fd90f1a86ca812479e29c1cd64bcdf67a27df
+Contract declaration transaction: 0x0109e2fed6285edc2a156f670a1d017196bb758b48602db6f7a4c6312271fe6a
+Class hash declared:
+0x07459430e068ca6d9daeadb305b9922e5c1826ff76b1b8992692b85b916d50fe
+purvachaudhari@Purvas-MacBook-Pro-2 LilaStark % starkli deploy 0x07459430e068ca6d9daeadb305b9922e5c1826ff76b1b8992692b85b916d50fe --account  /private/tmp/account1 --keystore /private/tmp/key1 --rpc "https://starknet-testnet.public.blastapi.io/rpc/v0_6"
+Enter keystore password: 
+Deploying class 0x07459430e068ca6d9daeadb305b9922e5c1826ff76b1b8992692b85b916d50fe with salt 0x04683e621fde2b6440fad4824cd28f5bca33e6a536e3034f4a0d897871549295...
+The contract will be deployed at address 0x03ca3c1b060088408797accebe72938ef8a5ac672c68bd3a92a5c193ad30ba3b
+Contract deployment transaction: 0x0449f799ca455a22b20da4b6a64a768a18d4bfe173079e05bdd3eb9f0f4bd320
+Contract deployed:
+0x03ca3c1b060088408797accebe72938ef8a5ac672c68bd3a92a5c193ad30ba3b
+purvachaudhari@Purvas-MacBook-Pro-2 LilaStark % 
