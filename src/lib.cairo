@@ -45,8 +45,9 @@ trait ILila<TContractState> {
     );
     fn fulfill_order(ref self: TContractState, id: felt252);
     fn withdraw(ref self: TContractState, id: felt252);
-    fn get_nonce(self: @TContractState) -> u64;
+    fn get_nonce(self: @TContractState, user: ContractAddress) -> u64;
     fn get_order(self: @TContractState, id: felt252) -> lila_on_starknet::OrderParams;
+    fn get_order_user(self: @TContractState, user: ContractAddress, nonce: u64) -> lila_on_starknet::OrderParams;
     fn get_strategy(self: @TContractState, id: felt252) -> lila_on_starknet::StrategyInfo;
     fn set_strategy (ref self: TContractState, token: ContractAddress, protocol: ContractAddress);
 }
@@ -54,6 +55,7 @@ trait ILila<TContractState> {
 #[starknet::contract]
 mod Lila {
     use core::traits::Into;
+    use starknet::ContractAddress;
     use starknet::get_block_timestamp;
     use openzeppelin::token::erc20::interface::{
         IERC20, IERC20Metadata, ERC20ABIDispatcher, ERC20ABIDispatcherTrait, IERC20Dispatcher
@@ -67,7 +69,7 @@ mod Lila {
     struct Storage {
         orders: LegacyMap::<felt252, lila_on_starknet::OrderParams>,
         strategy: LegacyMap::<felt252, lila_on_starknet::StrategyInfo>,
-        nonce: u64,
+        nonce: LegacyMap::<ContractAddress, u64>,
         total_strategy: u64
     }
 
@@ -100,11 +102,11 @@ mod Lila {
                 maker: starknet::contract_address_const::<0>(),
             };
 
-            let nonce = self.nonce.read();
+            let nonce = self.nonce.read(user);
             let id = PoseidonTrait::new().update(order.user.into()).update(nonce.into()).finalize();
 
             self.orders.write(id, order);
-            self.nonce.write(nonce + 1);
+            self.nonce.write(user, nonce + 1);
 
         }
 
@@ -188,8 +190,13 @@ mod Lila {
             self.orders.read(id)
         }
 
-        fn get_nonce(self: @ContractState) -> u64 {
-            self.nonce.read()
+        fn get_order_user(self: @ContractState, user: ContractAddress, nonce: u64) -> lila_on_starknet::OrderParams{
+            let id = PoseidonTrait::new().update(user.into()).update(nonce.into()).finalize();
+            self.orders.read(id)
+        }
+
+        fn get_nonce(self: @ContractState, user: ContractAddress) -> u64 {
+            self.nonce.read(user)
         }
     }
 }

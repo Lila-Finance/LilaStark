@@ -179,7 +179,7 @@ fn create_order(
         zklend
     );
 
-    let nonce = lila_dispatcher.get_nonce();
+    let nonce = lila_dispatcher.get_nonce(starknet::get_contract_address());
     let id = PoseidonTrait::new().update(this.into()).update(nonce.into()).finalize();
 
     lila_dispatcher.create_order(amount, interest, term_time, strategy);
