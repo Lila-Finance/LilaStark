@@ -47,6 +47,7 @@ trait ILila<TContractState> {
     fn withdraw(ref self: TContractState, id: felt252);
     fn get_nonce(self: @TContractState, user: ContractAddress) -> u64;
     fn get_order(self: @TContractState, id: felt252) -> lila_on_starknet::OrderParams;
+    fn get_order_id(self: @TContractState, user: ContractAddress, nonce: u64) -> felt252;
     fn get_order_user(self: @TContractState, user: ContractAddress, nonce: u64) -> lila_on_starknet::OrderParams;
     fn get_strategy(self: @TContractState, id: felt252) -> lila_on_starknet::StrategyInfo;
     fn set_strategy (ref self: TContractState, token: ContractAddress, protocol: ContractAddress);
@@ -189,6 +190,10 @@ mod Lila {
 
         fn get_order(self: @ContractState, id: felt252) -> lila_on_starknet::OrderParams {
             self.orders.read(id)
+        }
+
+        fn get_order_id(self: @ContractState, user: ContractAddress, nonce: u64) -> felt252 {
+            PoseidonTrait::new().update(user.into()).update(nonce.into()).finalize()
         }
 
         fn get_order_user(self: @ContractState, user: ContractAddress, nonce: u64) -> lila_on_starknet::OrderParams{
